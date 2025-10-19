@@ -1,0 +1,33 @@
+Program
+    | Statement
+    | Statements Statement
+Statement
+    | Seperator Command
+    | Comment
+Command
+    | Keyword Arguments
+    | Arg_List_Keyword Identifiers
+Seperator
+    | "|"
+Keyword
+    | "generate"
+    | "eval"
+Arg_List_Keyword
+    | "table"
+Arguments
+    | Argument
+    | Arguments Argument
+Argument
+    | Identifier Equal Value
+Identifiers
+    | Identifier
+    | Identifiers Identifier
+Identifier
+    | <Raw_String>
+Equal
+    | "="
+Value
+    | <String>
+    | <Number>
+Comment
+    | "/* <Raw_String> */"
