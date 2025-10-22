@@ -1,10 +1,10 @@
 use std::error::Error;
 
-use crate::{interpreter::Command, output::Table};
+use crate::{output::Table, parser::ParseNode};
 
 pub mod generate;
 pub mod eval;
 
 pub trait CommandExecutor {
-    fn execute(command: &Command, state: &mut Table) -> Result<(), Box<dyn Error>>;
+    fn execute(command: &ParseNode, state: &mut Table) -> Result<(), Box<dyn Error>>;
 }

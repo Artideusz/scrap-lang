@@ -1,5 +1,6 @@
 mod interpreter;
 mod scanner;
+mod parser;
 mod command;
 mod output;
 

@@ -2,18 +2,30 @@ use std::{collections::HashMap, error::Error, fmt::Display, hash::Hash, iter::{s
 
 
 #[derive(Debug, Clone, PartialEq)]
-pub enum Keyword {
+pub enum CommandKeyword {
     Generate,
-    Eval
+    Eval,
+    Where,
+    Table,
+    Rename,
+    Top,
+    Stats,
+    Remove
 }
 
-impl TryFrom<&String> for Keyword {
+impl TryFrom<&String> for CommandKeyword {
     type Error = Box<dyn Error>;
 
     fn try_from(value: &String) -> Result<Self, Self::Error> {
         match value.as_str() {
             "generate" => Ok(Self::Generate),
             "eval" => Ok(Self::Eval),
+            "where" => Ok(Self::Where),
+            "table" => Ok(Self::Table),
+            "rename" => Ok(Self::Rename),
+            "top" => Ok(Self::Top),
+            "stats" => Ok(Self::Stats),
+            "remove" => Ok(Self::Remove),
             // Add more commands here
             _ => Err("Unknown".into())
         }
@@ -21,26 +33,70 @@ impl TryFrom<&String> for Keyword {
 }
 
 #[derive(Debug, Clone, PartialEq)]
-pub enum ValueType {
-    String,
-    Number
+pub enum FuncKeyword {
+    Len,
+    Sum,
+    Count
 }
+
+impl TryFrom<&String> for FuncKeyword {
+    type Error = Box<dyn Error>;
+
+    fn try_from(value: &String) -> Result<Self, Self::Error> {
+        match value.as_str() {
+            "len" => Ok(Self::Len),
+            "sum" => Ok(Self::Sum),
+            "count" => Ok(Self::Count),
+            // Add more commands here
+            _ => Err("Unknown".into())
+        }
+    }
+}
+
+// #[derive(Debug, Clone, PartialEq)]
+// pub enum Keyword {
+//     Command(CommandKeyword),
+//     Func(FuncKeyword)
+// }
+
+// impl TryFrom<&String> for Keyword {
+//     type Error = Box<dyn Error>;
+
+//     fn try_from(value: &String) -> Result<Self, Self::Error> {
+//         if CommandKeyword::try_from(value).is_ok() {
+//             return Ok(Keyword::Command(CommandKeyword::try_from(value)?));
+//         }
+//         if FuncKeyword::try_from(value).is_ok() {
+//             return Ok(Keyword::Func(FuncKeyword::try_from(value)?));
+//         }
+//         return Err("Unknown".into());
+//     }
+// }
 
 #[derive(Debug, Clone, PartialEq)]
 pub enum TokenType {
-    // Single character
-    Seperator,
-    Equal,
+    Add,
+    Sub,
+    Eq,
+    Eeq,
+    Neq,
+    Gt,
+    Lt,
+    Gte,
+    Lte,
+    Separator,
     Comma,
-
-    // Multicharacter
+    LParen,
+    RParen,
+    And,
+    Or,
+    CommandKeyword(CommandKeyword),
+    FuncKeyword(FuncKeyword),
     Identifier,
-    Keyword(Keyword),
-    Value(ValueType),
-
-    // Other
+    Number,
+    String,
     Comment,
-
+    SpecialIdentifier,
     EOF
 }
 
@@ -65,7 +121,6 @@ struct Scanner {
     data: Vec<u8>,
     tokens: Vec<Token>,
     
-    _keywords: HashMap<String, Keyword>,
     _current_index: usize,
     _data_size: usize,
     
@@ -76,14 +131,9 @@ struct Scanner {
 
 impl Scanner {
     pub fn new() -> Scanner {
-        let mut keywords: HashMap<String, Keyword> = HashMap::new();
-
-        keywords.insert("generate".into(), Keyword::Generate);
-
         return Scanner {
             data: Vec::new(), 
             tokens: Vec::new(),
-            _keywords: keywords,
             _current_index: 0, 
             _data_size: 0,
             _line: 1,
@@ -118,8 +168,16 @@ impl Scanner {
     }
 
     fn handle_equals(&mut self) {
-        self.add_token(TokenType::Equal, None);
-        self.advance();
+        self.advance(); // We know this is '='
+
+        if let Some(c) = self.peek() {
+            if c == b'=' {
+                self.add_token(TokenType::Eeq, None);
+                self.advance();
+            } else {
+                self.add_token(TokenType::Eq, None);
+            }
+        }
     }
 
     fn handle_comma(&mut self) {
@@ -128,7 +186,7 @@ impl Scanner {
     }
 
     fn handle_seperator(&mut self) {
-        self.add_token(TokenType::Seperator, None);
+        self.add_token(TokenType::Separator, None);
         self.advance();
     }
 
@@ -195,13 +253,6 @@ impl Scanner {
         return false
     }
 
-    fn is_keyword(&mut self, val: &String) -> bool {
-        return match Keyword::try_from(val) {
-            Ok(_) => true,
-            Err(_) => false
-        }
-    }
-
     fn handle_identifier(&mut self) {
         let mut val: String = String::new();
         loop {
@@ -212,8 +263,14 @@ impl Scanner {
                     self.advance();
                 } else {
                     // If the keyword returns an error, just assume it is an identifier
-                    if let Ok(keyword) = Keyword::try_from(&val) {
-                        self.add_token(TokenType::Keyword(keyword), None);
+                    if let Ok(command) = CommandKeyword::try_from(&val) {
+                        self.add_token(TokenType::CommandKeyword(command), None);
+                    } else if let Ok(func) = FuncKeyword::try_from(&val) {
+                        if c == b'(' {
+                            self.add_token(TokenType::FuncKeyword(func), None);
+                        } else {
+                            self.add_token(TokenType::Identifier, Some(val));
+                        }
                     } else {
                         self.add_token(TokenType::Identifier, Some(val));
                     }
@@ -234,11 +291,11 @@ impl Scanner {
                     val.push(c as char);
                     self.advance();
                 } else {
-                    self.add_token(TokenType::Value(ValueType::Number), Some(val));
+                    self.add_token(TokenType::Number, Some(val));
                     break;
                 }
             } else {
-                self.add_token(TokenType::Value(ValueType::Number), Some(val));
+                self.add_token(TokenType::Number, Some(val));
                 break;
             }
         }
@@ -253,7 +310,7 @@ impl Scanner {
         loop {
             if let Some(c) = self.advance() {
                 if c == b'\"' {
-                    self.add_token(TokenType::Value(ValueType::String), Some(val));
+                    self.add_token(TokenType::String, Some(val));
                     break;
                 } 
                 else if c == b'\n' {
@@ -281,6 +338,73 @@ impl Scanner {
         }
     }
 
+    fn handle_special_identifier(&mut self) {
+        let mut val: String = String::new();
+
+        self.advance(); // We know this is the '$' character
+
+        loop {
+            if let Some(c) = self.peek() {
+                if self.is_alpha(c) {
+                    val.push(c as char);
+                    self.advance();
+                } else {
+                    self.add_token(TokenType::SpecialIdentifier, Some(val));
+                    break;
+                }
+            } else {
+                self.add_token(TokenType::SpecialIdentifier, Some(val));
+                break;
+            }
+        }
+    }
+
+    fn handle_add(&mut self) {
+        self.add_token(TokenType::Add, None);
+        self.advance();
+    }
+
+    fn handle_sub(&mut self) {
+        self.add_token(TokenType::Sub, None);
+        self.advance();
+    }
+
+    fn handle_lt(&mut self) {
+        self.advance(); // We know this is '<'
+
+        if let Some(c) = self.peek() {
+            if c == b'=' {
+                self.add_token(TokenType::Lte, None);
+                self.advance();
+            } else {
+                self.add_token(TokenType::Lt, None);
+            }
+        }
+    }
+
+    fn handle_gt(&mut self) {
+        self.advance(); // We know this is '>'
+
+        if let Some(c) = self.peek() {
+            if c == b'=' {
+                self.add_token(TokenType::Gte, None);
+                self.advance();
+            } else {
+                self.add_token(TokenType::Gt, None);
+            }
+        }
+    }
+
+    fn handle_lparen(&mut self) {
+        self.add_token(TokenType::LParen, None);
+        self.advance();
+    }
+
+    fn handle_rparen(&mut self) {
+        self.add_token(TokenType::RParen, None);
+        self.advance();
+    }
+
     pub fn scan(&mut self, data: &str) -> Vec<Token> {
         self.populate(data);
         // let mut iterator = text.as_bytes().iter().copied().peekable();
@@ -290,12 +414,19 @@ impl Scanner {
             if let Some(c) = self.peek() {
                 // print!("{}", char::from(c));
                 match c {
+                    b'+'  => self.handle_add(),
+                    b'-'  => self.handle_sub(),
+                    b'<'  => self.handle_lt(),
+                    b'>'  => self.handle_gt(),
+                    b'('  => self.handle_lparen(),
+                    b')'  => self.handle_rparen(),
                     b'='  => self.handle_equals(),
                     b','  => self.handle_comma(),
                     b'|'  => self.handle_seperator(),
                     b'/'  => self.handle_slash(),
                     b'\n' => self.handle_newline(true),
                     b'\"' => self.handle_string(),
+                    b'$'  => self.handle_special_identifier(),
                     _     => self.handle_rest()
                 }
                 continue;
@@ -305,68 +436,11 @@ impl Scanner {
 
         self.add_token(TokenType::EOF, None);
 
-        // println!("{}", data);
-        // println!("{:?}", self.tokens);
+        println!("{}", data);
+        println!("{:?}", self.tokens);
         return self.tokens.clone();
     }
 }
-
-// fn handle_comment(mut iterator: impl Iterator<Item = u8>, tokens: &mut Vec<Token>) {
-    
-// }
-
-// fn handle_slash(mut iterator: impl Iterator<Item = u8>, tokens: &mut Vec<Token>) {
-//     if let Some(c) = iterator.next() {
-//         match c {
-//             b'*' => handle_comment(iterator, tokens),
-//             _ => {}
-//         }
-//     };
-// }
-
-// // fn handle_equals() {
-
-// // }
-
-// fn is_alpha(val: u8) -> bool {
-//     // uppercase letters
-//     if val >= 65 && val <= 90 {
-//         return true
-//     }
-
-//     // lowercase letters
-//     if val >= 97 && val <= 122 {
-//         return true
-//     }
-
-//     return false
-// }
-
-// fn handle_identifier(mut iterator: &mut Peekable<impl Iterator<Item = u8>>, tokens: &mut Vec<Token>) {
-//     let mut identifier: String = String::new();
-
-//     loop {
-//         if let Some(c) = iterator.next() {
-//             if is_alpha(c) {
-//                 identifier.push(c as char);
-//             } else {
-//                 break;
-//             }
-//         }
-//     }
-
-
-// }
-
-
-// fn handle_rest(iterator: &mut Peekable<impl Iterator<Item = u8>>, tokens: &mut Vec<Token>) {
-//     if let Some(c) = iterator.peek() {
-//         if is_alpha(*c) {
-//             handle_identifier(iterator, tokens);
-//         }
-//     }
-// }
-
 
 pub(crate) fn scan(text: &str) -> Vec<Token> {
     let mut ctx = Scanner::new();

@@ -1,0 +1,107 @@
+
+/// Lexer grammar
+// Operators
+
+ADD -> "+"
+SUB -> "-"
+
+EQ -> "="
+
+EEQ -> "=="
+NEQ -> "!="
+
+GT -> ">"
+LT -> "<"
+GTE -> ">="
+LTE -> "<="
+
+SEPARATOR -> "|"
+COMMA -> ","
+
+LPAREN -> "("
+RPAREN -> ")"
+
+// keywords
+AND -> "and"
+OR -> "or"
+
+COMMAND_KEYWORD
+    -> "generate"
+    -> "eval"
+    -> "where"
+    -> "table"
+    -> "rename"
+    -> "top"
+    -> "stats"
+
+FUNC_KEYWORD
+    -> "len"
+    -> "count"
+    -> "sum"
+
+// Other
+
+IDENTIFIER -> regex( [a-zA-Z][a-zA-Z0-9]+ )
+
+NUMBER -> regex( [0-9]+ )
+STRING -> regex( \"[^\"]*\" )
+
+COMMENT -> regex( /*[.]*?*/ )
+
+SPECIAL_IDENTIFIER -> regex( \$[a-zA-Z]+ )
+
+/// Parser grammar
+
+VALUE 
+    -> NUMBER
+    -> STRING
+    -> IDENTIFIER
+    -> SPECIAL_IDENTIFIER
+    -> FUNC_KEYWORD LPAREN VALUE RPAREN // len("hello")
+
+ARITHMETIC_OPERATOR
+    -> ADD
+    -> SUB
+
+COMPARISON_OPERATOR
+    -> EEQ
+    -> NEQ
+    -> LT
+    -> GT
+    -> GTE
+    -> LTE
+
+COMPARISON
+    -> VALUE COMPARISON_OPERATOR VALUE 
+
+EXPRESSION
+    -> VALUE ARITHMETIC_OPERATOR VALUE // x + 3, $row - 2
+    -> EXPRESSION ARITHMETIC_OPERATOR VALUE ARITHMETIC_OPERATOR VALUE // x + 2 - $row
+
+ASSIGNMENT
+    -> IDENTIFIER EQUAL VALUE
+    -> IDENTIFIER EQUAL EXPRESSION
+
+ARGUMENT
+    -> ASSIGNMENT
+    -> IDENTIFIER
+    -> COMPARISON
+    -> NUMBER
+
+ARGUMENTS 
+    -> ARGUMENT
+    -> ARGUMENTS ARGUMENT
+    IDENTIFIER_ONLY -> ARGUMENTS[IDENTIFIER_ONLY] COMMA ARGUMENT[IDENTIFIER_ONLY]
+
+COMMAND
+    -> SEPARATOR COMMAND_KEYWORD ARGUMENTS?
+
+STATEMENT
+    -> COMMAND
+    -> COMMENT
+
+STATEMENTS
+    -> STATEMENT
+    -> STATEMENTS STATEMENT
+
+QUERY -> STATEMENTS EOF

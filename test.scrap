@@ -1,4 +1,35 @@
-| generate count=5 name="world"
-| eval this = "is working!"
-| eval hello = "world"
-/* this is a comment */
+| generate count=20 name="hello"
+| eval row = $row /* another comment */
+| eval stuff = "something" + row
+/* Some comment */
+| remove hello
+| where row >= 10
+| rename row = "wor"
+/* | stats count(wor) */
+/* Output should be:
+count(wor)
+----------
+10
+*/
+
+
+/*
+
+{
+    Command
+    {
+        Argument {
+            Value,
+            Assignment
+        }
+        Argument,
+    }
+}
+
+
+
+
+
+
+
+*/
