@@ -23,7 +23,7 @@ use crate::scanner::{Token, TokenType};
 
 // impl Statement for Comment {}
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, PartialEq)]
 pub enum ParseNodeType {
     Value,
     ArithmeticOperator,
@@ -43,6 +43,57 @@ pub struct ParseNode {
     pub variant: ParseNodeType,
     pub children: Option<Vec<ParseNode>>,
     pub token: Option<Token>
+}
+
+// Thanks GPT!
+impl ParseNode {
+    /// Return child nodes safely
+    pub fn children(&self) -> &[ParseNode] {
+        self.children.as_deref().unwrap_or(&[])
+    }
+
+    /// Get first child if exists
+    pub fn first_child(&self) -> Option<&ParseNode> {
+        self.children.as_ref()?.first()
+    }
+
+    /// Get nth child
+    pub fn child(&self, index: usize) -> Option<&ParseNode> {
+        self.children.as_ref()?.get(index)
+    }
+
+    /// Get the token’s string value (if present)
+    pub fn token_value(&self) -> Option<&String> {
+        self.token.as_ref()?.value.as_ref()
+    }
+
+    /// Find the first descendant node of a given type
+    pub fn find_child_of_type(&self, kind: ParseNodeType) -> Option<&ParseNode> {
+        self.children().iter().find(|c| c.variant == kind)
+    }
+
+    pub fn expect_type(&self, kind: ParseNodeType) -> Result<&ParseNode, Box<dyn Error>> {
+        if self.variant == kind {
+            return Ok(self);
+        } else {
+            return Err(format!("Unexpected type {:?}", self.variant).into());
+        }
+    }
+
+    pub fn expect_token_type(&self, kind: TokenType) -> Result<&ParseNode, Box<dyn Error>> {
+        let token = &self.token;
+        if let Some(token) = token {
+            if token.token_type == kind {
+                return Ok(self);
+            } else {
+                return Err("Unexpected token".into());
+            }
+        } else {
+            return Err("Token is empty".into());
+        }
+    }
+
+    // pub fn walk(&self, )
 }
 
 struct Parser {
@@ -89,7 +140,7 @@ impl Parser {
             TokenType::Identifier |
             TokenType::SpecialIdentifier |
             TokenType::String => Ok(result),
-            _ => Err(format!("Unexpected token {:?} at line {} offset {}", token, token.line, token.offset).into())
+            _ => Err(format!("Unexpected token {:} at line {} offset {}", token, token.line, token.offset).into())
         }
     }
 
@@ -118,7 +169,7 @@ impl Parser {
         return match token.token_type {
             TokenType::Add |
             TokenType::Sub => Ok(result),
-            _ => Err(format!("Unexpected token {:?} at line {} offset {}", token, token.line, token.offset).into())
+            _ => Err(format!("Unexpected token {:} at line {} offset {}", token, token.line, token.offset).into())
         }
     }
 
@@ -140,14 +191,22 @@ impl Parser {
 
     // IDENTIFIER EQUAL VALUE
     // IDENTIFIER EQUAL EXPRESSION
+    // SPECIAL_IDENTIFIER EQUAL VALUE
+    // SPECIAL_IDENTIFIER EQUAL EXPRESSION
     fn assignment(&mut self) -> Result<ParseNode, Box<dyn Error>> {
         let mut children = Vec::new();
         
-        if !self.is_token(TokenType::Identifier) {
-            return Err("Invalid token".into());
-        }
+        // if !self.is_token(TokenType::Identifier) {
+        //     return Err("Invalid token".into());
+        // }
 
-        children.push(self.value()?); // Identifier required
+        let identifier = self.value()?;
+        let identifier = identifier
+            .expect_token_type(TokenType::Identifier)
+            .or_else(|_| identifier.expect_token_type(TokenType::SpecialIdentifier))?
+            .to_owned();
+
+        children.push(identifier); // Identifier required
         self.expect(TokenType::Eq)?;
         
         let pos = self.get_position();
@@ -175,7 +234,7 @@ impl Parser {
             TokenType::Lte | 
             TokenType::Gt  |
             TokenType::Gte => Ok(result),
-            _ => Err(format!("Unexpected token {:?} at line {} offset {}", token, token.line, token.offset).into())
+            _ => Err(format!("Unexpected token {:} at line {} offset {}", token, token.line, token.offset).into())
         }
     }
 
@@ -236,7 +295,7 @@ impl Parser {
         let token = self.expect_any()?;
 
         if !matches!(token.token_type, TokenType::CommandKeyword(_)) {
-            return Err(format!("Unexpected token {:?} at line {} offset {}", token, token.line, token.offset).into());
+            return Err(format!("Unexpected token {:} at line {} offset {}", token, token.line, token.offset).into());
         }
 
         let args = self.arguments()?;
@@ -268,7 +327,8 @@ impl Parser {
             return Ok(ParseNode { variant: ParseNodeType::Statement, children: Some(vec![self.comment()?]), token: None });
         }
 
-        return Err("Invalid statement".into());
+        let token = self.expect_any()?;
+        return Err(format!("Unexpected token {:} at line {} offset {}", token, token.line, token.offset).into());
     }
 
     fn peek(&self) -> Option<Token> {
@@ -310,7 +370,7 @@ impl Parser {
                     self.consume();
                     return Ok(token);
                 }
-                return Err(format!("Did not expect token {} on line {} offset {}", token, token.line, token.offset).into());
+                return Err(format!("Did not expect token {:} on line {} offset {}", token, token.line, token.offset).into());
             },
             None => Err("Unexpected EOF".into())
         }
@@ -341,9 +401,9 @@ impl Parser {
 pub fn parse(tokens: &Vec<Token>) -> Result<ParseNode, Box<dyn Error>> {
     // let mut output: Table = Table::new();
     let mut ctx = Parser::new();
-    ctx.parse(tokens).expect("Cannot parse tokens");
+    ctx.parse(tokens)?;
 
-    // println!("{:#?}", ctx.parse_tree);
+    // println!("{:?}", ctx.parse_tree);
     
     return Ok(ctx.parse_tree.clone()); // Yuck
 }

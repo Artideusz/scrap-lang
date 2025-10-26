@@ -277,6 +277,7 @@ impl Scanner {
                     break;
                 }
             } else {
+                self.add_token(TokenType::Identifier, Some(val));
                 break;
             }
         }
@@ -341,11 +342,11 @@ impl Scanner {
     fn handle_special_identifier(&mut self) {
         let mut val: String = String::new();
 
-        self.advance(); // We know this is the '$' character
+        val.push(self.advance().unwrap() as char); // We know this is the '$' character
 
         loop {
             if let Some(c) = self.peek() {
-                if self.is_alpha(c) {
+                if self.is_alpha(c) || self.is_numeric(c) {
                     val.push(c as char);
                     self.advance();
                 } else {
@@ -436,8 +437,8 @@ impl Scanner {
 
         self.add_token(TokenType::EOF, None);
 
-        println!("{}", data);
-        println!("{:?}", self.tokens);
+        // println!("{}", data);
+        // println!("{:?}", self.tokens);
         return self.tokens.clone();
     }
 }

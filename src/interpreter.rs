@@ -33,9 +33,9 @@
 
 */
 
-use std::{error::Error, fs::File, io::{BufReader, Read}};
+use std::{error::Error, fs::File, io::{self, BufReader, Read, Write}, os::linux::raw::stat};
 
-use crate::{command::{self, CommandExecutor}, interpreter, output::Table, parser::{parse, ParseNode, ParseNodeType}, scanner::{scan, CommandKeyword, Token}};
+use crate::{command::{self, CommandExecutor}, interpreter, output::Table, parser::{parse, ParseNode, ParseNodeType}, scanner::{scan, CommandKeyword, Token, TokenType}};
 
 
 struct Interpreter {
@@ -47,26 +47,103 @@ impl Interpreter {
         return Interpreter { output: Table::new() };
     }
 
-    pub fn execute(&mut self, parse_tree: ParseNode) -> Result<(), Box<dyn Error>> {
-        // let children = parse_tree.children.unwrap();
-        // for node in children {
-        //     if matches!(node.variant, ParseNodeType::Statement) {
-        //         let child = node.children.unwrap().get(0).unwrap();
-        //         if matches!(child.variant, ParseNodeType::Command) {
+    pub fn execute_value(&mut self, value: &ParseNode) -> Result<(), Box<dyn Error>> {
+        return Ok(());
+    }
 
-        //         }
-        //         let command = node.token.clone().unwrap();
-        //         let keyword = match command.token_type {
-        //             crate::scanner::TokenType::CommandKeyword(k) => Ok(k),
-        //             _ => Err("Not a command")
-        //         }?.clone();
-                
-        //         match keyword {
-        //             CommandKeyword::Generate => Ok(command::generate::Generate::execute(&node, &mut self.output)?),
-        //             _ => Err("Oh shucks")
-        //         }?;
-        //     }
+    pub fn execute_expression(&mut self, expression: &ParseNode) -> Result<(), Box<dyn Error>> {
+        let children = expression.children();
+
+        let lvalue = if matches!(&children[0].variant, ParseNodeType::Expression) {
+            self.execute_expression(&children[0])?
+        } else {
+            self.execute_value(&children[0])?
+        };
+        
+        let operator = &children[1];
+
+        let rvalue = if matches!(&children[2].variant, ParseNodeType::Expression) {
+            self.execute_expression(&children[2])?
+        } else {
+            self.execute_value(&children[2])?
+        };
+
+        return Ok(());
+    }
+
+    pub fn execute_assignment(&mut self, argument: &ParseNode) -> Result<(), Box<dyn Error>> {
+        let identifier = argument.child(0).unwrap().token_value().unwrap();
+
+        return Ok(());
+    }
+
+    // Substitution and reduction happens here
+    pub fn execute_argument(&mut self, argument: &ParseNode) -> Result<(), Box<dyn Error>> {
+        // Is it an assignment?
+        if matches!(argument.variant, ParseNodeType::Assignment) {
+            return Ok(self.execute_assignment(argument)?);
+        }
+        return Ok(());
+    }
+
+    pub fn execute_command(&mut self, command_tree: &ParseNode) -> Result<(), Box<dyn Error>> {        
+        // Check if parse node is a command
+        if !matches!(command_tree.variant, ParseNodeType::Command) {
+            return Err("Not a command!".into());
+        }
+
+        // All child nodes are arguments
+        let args = command_tree.children();
+
+        // for arg in args {
+        //     self.execute_argument(arg)?;
         // }
+
+
+        // let args = command_tree.children.as_ref().unwrap();
+        let token = command_tree.token.as_ref().unwrap();
+
+        let command = &token.token_type;
+
+        let _ = match command {
+            TokenType::CommandKeyword(CommandKeyword::Generate) => crate::command::generate::Generate::execute(args, &mut self.output).unwrap(),
+            TokenType::CommandKeyword(CommandKeyword::Eval) => crate::command::eval::Eval::execute(args, &mut self.output).unwrap(),
+            _ => return Ok(())
+        };
+
+        return Ok(());
+    }
+
+    pub fn execute_statement(&mut self, statement_tree: &ParseNode) -> Result<(), Box<dyn Error>> {
+        // Check if parse node is a statement
+        if !matches!(statement_tree.variant, ParseNodeType::Statement) {
+            return Err("Fuck".into());
+        }
+
+        if let Some(child_nodes) = statement_tree.children.as_ref() {
+            for child in child_nodes {
+                match child.variant {
+                    ParseNodeType::Command => self.execute_command(child)?,
+                    _ => continue
+                }
+            }
+        }
+
+        return Ok(());
+    }
+
+    pub fn execute(&mut self, parse_tree: ParseNode) -> Result<(), Box<dyn Error>> {
+        // Check if parse node is a query
+        if !matches!(parse_tree.variant, ParseNodeType::Query) {
+            return Err("Fuck".into());
+        }
+
+        let children = parse_tree.children.as_ref().unwrap();
+        
+        for child in children {
+            self.execute_statement(child)?;
+        }
+
         return Ok(());
     }
 }
@@ -87,9 +164,70 @@ pub(crate) fn run_file(file_path: &str) -> Result<(), Box<dyn Error>> {
     let tokens: Vec<Token> = scan(&data);
     let result = parse(&tokens).unwrap();
 
+    // println!("{:?}", result);
+
     let mut interpreter = Interpreter::new();
     
     interpreter.execute(result).unwrap();
+
+    interpreter.output.display();
+
+    return Ok(());
+}
+
+pub(crate) fn repl() -> Result<(), Box<dyn Error>> {
+    let mut interpreter = Interpreter::new();
+
+    loop {
+        print!("> ");
+        io::stdout().flush().expect("Error in stdout flush");
+        
+        let mut data = String::new();
+        
+        io::stdin()
+            .read_line(&mut data)
+            .expect("Error in stdin read");
+
+        let data = data.trim();
+
+        if data == "table" {
+            interpreter.output.display();
+            continue;
+        }
+
+        if data == "clear" {
+            print!("\x1B[2J\x1B[1;1H");
+            io::stdout().flush().expect("Error in stdout flush");
+            continue;
+        }
+
+        if data == "quit" {
+            break;
+        }
+
+        if data == "" {
+            continue;
+        }
+
+        let tokens = scan(data);
+        let parse_tree = match parse(&tokens) {
+            Ok(k) => k,
+            Err(v) => {
+                println!("Parser error: {}", v);
+                continue;
+            }
+        };
+
+        match interpreter.execute(parse_tree) {
+            Ok(k) => k,
+            Err(v) => {
+                println!("Interpreter error: {}", v);
+                continue;
+            }
+        };
+
+        interpreter.output.display();
+    }
 
     return Ok(());
 }

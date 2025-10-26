@@ -13,5 +13,6 @@ fn main() {
         .cloned()
         .unwrap_or("./test.scrap".into());
 
-    crate::interpreter::run_file(&path).unwrap();
+    // crate::interpreter::run_file(&path).unwrap();
+    interpreter::repl().unwrap();
 }
