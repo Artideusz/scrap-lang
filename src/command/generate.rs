@@ -35,7 +35,7 @@ impl CommandExecutor for Generate {
 
         state.clear();
 
-        println!("{:?}", name_arg);
+        // println!("{:?}", name_arg);
 
         let name = name_arg.unwrap_or(format!("${}", 1).into());
         
