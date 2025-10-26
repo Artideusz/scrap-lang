@@ -106,8 +106,8 @@ impl Interpreter {
         let command = &token.token_type;
 
         let _ = match command {
-            TokenType::CommandKeyword(CommandKeyword::Generate) => crate::command::generate::Generate::execute(args, &mut self.output).unwrap(),
-            TokenType::CommandKeyword(CommandKeyword::Eval) => crate::command::eval::Eval::execute(args, &mut self.output).unwrap(),
+            TokenType::CommandKeyword(CommandKeyword::Generate) => crate::command::generate::Generate::execute(args, &mut self.output)?,
+            TokenType::CommandKeyword(CommandKeyword::Eval) => crate::command::eval::Eval::execute(args, &mut self.output)?,
             _ => return Ok(())
         };
 

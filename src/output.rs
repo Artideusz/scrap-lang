@@ -36,6 +36,7 @@ impl Table {
         return Ok(());
     }
 
+    // TODO: Add condition index > 0
     pub fn get_row_env(&self, index: usize) -> Result<HashMap<String, String>, Box<dyn Error>> {
         let mut result: HashMap<String, String> = HashMap::new();
         let keys = self.cells[0].clone();
@@ -46,7 +47,7 @@ impl Table {
         for (key, cell) in zip(keys, rows) {
             result.insert(key, cell);
             // Special identifiers are returned here
-            result.insert(String::from("$rowcount"), (index + 1).to_string());
+            result.insert(String::from("$rowcount"), index.to_string());
         };
 
         return Ok(result);

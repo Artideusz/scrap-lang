@@ -11,7 +11,7 @@ pub trait CommandExecutor {
 
     // Input: Value or Expression node, hashmap of variables.
     // Output: An evaluated Value node.
-    fn evaluate(val_or_expr: &ParseNode, env: HashMap<String, String>) -> Result<ParseNode, Box<dyn Error>> {
+    fn evaluate(val_or_expr: &ParseNode, env: &HashMap<String, String>) -> Result<ParseNode, Box<dyn Error>> {
         
         // When we have a Value of type Identifier or SpecialIdentifier:
         // - We just subsitute the variable into a value node
@@ -30,16 +30,20 @@ pub trait CommandExecutor {
         } else if matches!(val_or_expr.variant, ParseNodeType::Expression) {
             let children = val_or_expr.children();
             // Left node is always a Value
-            let lvalue = children[0]
-                .expect_type(ParseNodeType::Value)?;
+            let lvalue = &children[0];
+
+            // It's possible that the value will be an identifier
+            let lvalue = &Self::evaluate(lvalue, &env)?;
+            
             // Middle node is always an operator
             let operator = children[1]
                 .expect_type(ParseNodeType::ArithmeticOperator)?;
+            
             // This will be either a Value or Expression
             let rvalue: &ParseNode = &children[2];
 
             // If rvalue is an Expression, recursively call and change the node
-            let rvalue = &Self::evaluate(rvalue, env)?;
+            let rvalue = &Self::evaluate(rvalue, &env)?;
 
             // Calculate expression
             return if operator.expect_token_type(TokenType::Add).is_ok() {

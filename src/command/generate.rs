@@ -9,8 +9,9 @@ impl CommandExecutor for Generate {
         let mut count_arg: Option<String> = None;
         let mut name_arg: Option<String> = None;
 
-        for arg in args {
-            let arg_type_node = arg.child(0).unwrap();
+        // println!("{:?}", args);
+        for arg in args[0].children() {
+            let arg_type_node = arg;
             
             if !matches!(arg_type_node.variant, ParseNodeType::Assignment) {
                 return Err("Invalid argument type".into());
@@ -30,10 +31,13 @@ impl CommandExecutor for Generate {
 
         // let count = command.arguments.get("count").unwrap().clone();
         let count: usize = count_arg.unwrap().parse()?;
-        let col_pos: usize = state.col_count() + 1;
-        let name = name_arg.unwrap_or(format!("${}", col_pos).into());
-    
+        // let col_pos: usize = state.col_count() + 1;
+
         state.clear();
+
+        println!("{:?}", name_arg);
+
+        let name = name_arg.unwrap_or(format!("${}", 1).into());
         
         state.add_col(&name, None);
         

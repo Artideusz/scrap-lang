@@ -47,7 +47,7 @@ impl CommandExecutor for Eval {
         for i in 1..row_count {
             let env: HashMap<String, String> = state.get_row_env(i)?;
             // println!("{:?}", env);
-            let evaluated_val = <Eval as CommandExecutor>::evaluate(val_or_expr, env)?; // What?
+            let evaluated_val = <Eval as CommandExecutor>::evaluate(val_or_expr, &env)?; // What?
             let evaluated_val = evaluated_val.token_value().unwrap();
             state.set_cell(col_index, i, evaluated_val)?;
         }
