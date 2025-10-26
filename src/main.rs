@@ -10,9 +10,11 @@ fn main() {
     let args: Vec<String> = env::args().collect();
 
     let path = args.get(1)
-        .cloned()
-        .unwrap_or("./test.scrap".into());
+        .cloned();
 
-    // crate::interpreter::run_file(&path).unwrap();
-    interpreter::repl().unwrap();
+    if let Some(path) = path {
+        crate::interpreter::run_file(&path).unwrap();
+    } else {
+        interpreter::repl().unwrap();
+    }    
 }
