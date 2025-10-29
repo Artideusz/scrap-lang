@@ -67,6 +67,11 @@ impl ParseNode {
         self.token.as_ref()?.value.as_ref()
     }
 
+    /// Get the token's type
+    pub fn token_type(&self) -> TokenType {
+        self.token.as_ref().unwrap().token_type.clone()
+    }
+
     /// Find the first descendant node of a given type
     pub fn find_child_of_type(&self, kind: ParseNodeType) -> Option<&ParseNode> {
         self.children().iter().find(|c| c.variant == kind)

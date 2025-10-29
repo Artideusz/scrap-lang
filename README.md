@@ -86,6 +86,35 @@ Example Syntax:
 +-------------+
 ```
 
+### where
+
+This command filters the results by some comparison.
+
+#### Syntax
+
+```
+| where <value> <comparison_operator> <value>
+```
+
+- `value` - Either String, Number, Identifier or SpecialIdentifier.
+- `comparison_operator` - Either `<`, `>`, `<=`, `>=`, `!=` or `==`.
+
+#### Example
+
+```
+| generate count=5 name="xyz"
+| eval xyz = $rowcount
+| where xyz < 3
+
++---------+
+| xyz     |
++---------+
+| 1       |
++---------+
+| 2       |
++---------+
+```
+
 ## Available REPL commands:
 
 Scrap-Lang comes with a REPL environment by default, where you can play with the language. These commands do not interact with the language and are just there for ease of use.

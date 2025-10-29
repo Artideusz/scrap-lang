@@ -4,6 +4,7 @@ use crate::{output::Table, parser::{ParseNode, ParseNodeType}, scanner::{Token, 
 
 pub mod generate;
 pub mod eval;
+pub mod r#where;
 
 // TODO: Clean up this trait
 pub trait CommandExecutor {

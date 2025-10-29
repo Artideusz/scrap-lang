@@ -121,6 +121,11 @@ impl Table {
         return Ok(());
     }
 
+    pub fn remove_row(&mut self, index: usize) -> Result<(), Box<dyn Error>> {
+        self.cells.remove(index);
+        return Ok(());
+    }
+
     pub fn display(&self) {
         let max_width_sum: usize = self.max_width.iter().sum();
         if self.max_width.len() == 0 {

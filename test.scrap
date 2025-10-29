@@ -1,4 +1,3 @@
-| generate count=10
-| eval x = 2 + $rowcount
-| eval $1 = "hello"
-| eval $1 = "world"
+| generate count=5 name="xyz"
+| eval xyz = "Hello " + $rowcount
+| where xyz != "Hello 3"

@@ -406,6 +406,16 @@ impl Scanner {
         self.advance();
     }
 
+    fn handle_exclamation(&mut self) {
+        self.advance();
+        if let Some(c) = self.peek() {
+            if c == b'=' {
+                self.add_token(TokenType::Neq, None);
+                self.advance();
+            } // else if !self.is_alphanumeric() { TokenType::Not }
+        }
+    }
+
     pub fn scan(&mut self, data: &str) -> Vec<Token> {
         self.populate(data);
         // let mut iterator = text.as_bytes().iter().copied().peekable();
@@ -428,6 +438,7 @@ impl Scanner {
                     b'\n' => self.handle_newline(true),
                     b'\"' => self.handle_string(),
                     b'$'  => self.handle_special_identifier(),
+                    b'!'  => self.handle_exclamation(),
                     _     => self.handle_rest()
                 }
                 continue;
